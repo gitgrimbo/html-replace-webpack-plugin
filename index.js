@@ -1,3 +1,5 @@
+const path = require("path");
+
 function HtmlReplaceWebpackPlugin(options) {
   options = Array.isArray(options) ? options : [options]
 
@@ -7,7 +9,7 @@ function HtmlReplaceWebpackPlugin(options) {
     }
   })
 
-  this.replace = function (htmlPluginData, callback) {
+  this.replace = (compiler) => (htmlPluginData, callback) => {
     options.forEach(option => {
       if (typeof option.replacement === 'function') {
         try {
@@ -16,7 +18,9 @@ function HtmlReplaceWebpackPlugin(options) {
           throw new Error('Invalid `pattern` option provided, it must be a valid regex.')
         }
 
-        htmlPluginData.html = htmlPluginData.html.replace(option.pattern, option.replacement)
+        const outputFile = path.resolve(compiler.outputPath, htmlPluginData.outputName);
+        const replacement = (...args) => option.replacement(...[outputFile].concat(args));
+        htmlPluginData.html = htmlPluginData.html.replace(option.pattern, replacement)
       } else {
         if (option.pattern instanceof RegExp)
           htmlPluginData.html = htmlPluginData.html.replace(option.pattern, option.replacement)
@@ -35,7 +39,7 @@ HtmlReplaceWebpackPlugin.prototype.apply = function (compiler) {
       if (compilation.hooks.htmlWebpackPluginAfterHtmlProcessing) {
         compilation.hooks.htmlWebpackPluginAfterHtmlProcessing.tapAsync(
           'HtmlReplaceWebpackPlugin',
-          this.replace
+          this.replace(compiler)
         )
       } else {
         var HtmlWebpackPlugin = require('html-webpack-plugin')
@@ -48,13 +52,13 @@ HtmlReplaceWebpackPlugin.prototype.apply = function (compiler) {
 
         HtmlWebpackPlugin.getHooks(compilation).beforeEmit.tapAsync(
           'HtmlReplaceWebpackPlugin',
-          this.replace
+          this.replace(compiler)
         )
       }
     })
   } else {
     compiler.plugin('compilation', compilation => {
-      compilation.plugin('html-webpack-plugin-beforeEmit', this.replace)
+      compilation.plugin('html-webpack-plugin-beforeEmit', this.replace(compiler))
     })
   }
 }
